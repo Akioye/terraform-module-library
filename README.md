@@ -96,7 +96,7 @@ The CI pipeline is active on this repo. Every PR triggers real AWS validation ac
 | S3 + DynamoDB | Stores and locks infrastructure state |
 | GitHub Actions | Runs automatic checks on every code change |
 | EKS | Managed Kubernetes for running applications |
-| RDS | Managed Postgres database |
+| RDS | Managed Postgres database. |
 
 ---
 
