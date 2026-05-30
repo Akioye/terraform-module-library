@@ -1,96 +1,146 @@
-# Terraform Module Library  
+# Terraform Module Library
 
-Production-grade, reusable Terraform modules for AWS infrastructure. Three fully isolated environments share the same module code with environment-specific variables — the pattern senior engineers actually use.
+> Built by Toby Akioye · [github.com/Akioye/terraform-module-library](https://github.com/Akioye/terraform-module-library)
 
 ---
 
-## Structure
+## What is this?
+
+This project is a **production-grade cloud infrastructure library** built on AWS using Terraform.
+
+In plain terms — instead of manually clicking around in AWS to create servers, databases, and networks, everything here is written as code. You run one command and the entire infrastructure builds itself. You run another command and it tears itself down cleanly.
+
+This is how serious engineering teams manage infrastructure at scale.
+
+---
+
+## What problem does it solve?
+
+Most engineers set up cloud infrastructure manually — logging into AWS, clicking buttons, hoping they remember what they did. That approach breaks down fast:
+
+- No record of what was created or why
+- Can't reproduce it reliably
+- One wrong click can take down production
+- No way to test changes safely before they go live
+
+This project solves all of that. Every server, database, network, and permission is defined in code, version controlled, automatically tested, and fully reproducible.
+
+---
+
+## What's inside
+
+### 5 reusable modules
+
+Think of these as blueprints. Write once, use everywhere.
+
+| Module | What it builds |
+|---|---|
+| `vpc` | The network — like the walls and rooms of a building |
+| `iam` | Permissions — who is allowed to do what |
+| `s3` | File storage — secure buckets for uploads, logs, backups |
+| `rds` | The database — Postgres, encrypted, backed up automatically |
+| `eks` | A Kubernetes cluster — where applications run |
+
+### 3 isolated environments
+
+The same blueprints are used three times with different settings:
+
+| Environment | Purpose | Size |
+|---|---|---|
+| `dev` | Where you build and test. Break things here, not in prod | Small + cheap |
+| `staging` | Rehearsal — looks exactly like prod but not live | Medium |
+| `prod` | The real thing. Tightest security, deletion protection on | Reliable |
+
+### Automated quality control (CI)
+
+Every time a code change is proposed, the system automatically:
+1. Checks if it would work in dev
+2. Checks if it would work in staging
+3. Checks if it would work in prod
+4. Blocks the change from going through if any check fails
+
+No human has to manually verify anything. The system does it in under 30 seconds.
+
+---
+
+## How it works in practice
+
+```
+Engineer makes a change
+        ↓
+Opens a Pull Request (proposes the change)
+        ↓
+System automatically tests all 3 environments in parallel
+        ↓
+All pass? → Change is allowed through
+Any fail? → Change is blocked until fixed
+        ↓
+Engineer applies the change manually
+dev → staging → prod
+```
+
+---
+
+## Live proof
+
+The CI pipeline is active on this repo. Every PR triggers real AWS validation across all three environments. You can see the results in the Actions tab.
+
+---
+
+## Tech stack
+
+| Tool | What it does |
+|---|---|
+| Terraform | Writes infrastructure as code |
+| AWS | The cloud platform everything runs on |
+| S3 + DynamoDB | Stores and locks infrastructure state |
+| GitHub Actions | Runs automatic checks on every code change |
+| EKS | Managed Kubernetes for running applications |
+| RDS | Managed Postgres database |
+
+---
+
+## Project structure
 
 ```
 terraform-module-library/
-├── bootstrap/               # Run once: creates S3 + DynamoDB for remote state
-├── modules/
-│   ├── vpc/                 # VPC, subnets, IGW, NAT, route tables, flow logs
-│   ├── iam/                 # Roles, policies, instance profiles
-│   ├── s3/                  # Buckets, versioning, encryption, lifecycle
-│   ├── rds/                 # RDS instance, subnet group, security group
-│   └── eks/                 # EKS cluster, managed node groups, OIDC
-├── environments/
-│   ├── dev/                 # t3.micro, single AZ, no HA
-│   ├── staging/             # t3.medium, multi-AZ, mirrors prod config
-│   └── prod/                # r5.large, HA, deletion protection enabled
-└── .github/
-    └── workflows/
-        └── terraform-plan.yml   # Plans all 3 envs on every PR
+│
+├── bootstrap/          → Creates the state storage system (run once)
+├── modules/            → The 5 reusable blueprints
+│   ├── vpc/
+│   ├── iam/
+│   ├── s3/
+│   ├── rds/
+│   └── eks/
+├── environments/       → Three environments using the same blueprints
+│   ├── dev/
+│   ├── staging/
+│   └── prod/
+├── .github/workflows/  → Automatic checks that run on every change
+└── docs/               → Full documentation
 ```
 
-## Modules
+---
 
-| Module | What it creates |
+## Documentation
+
+| Doc | What it covers |
 |---|---|
-| [`vpc`](./modules/vpc/) | VPC, public/private subnets, IGW, NAT GW, flow logs |
-| [`iam`](./modules/iam/) | IAM roles, policies, instance profiles |
-| [`s3`](./modules/s3/) | S3 bucket with versioning, encryption, lifecycle rules |
-| [`rds`](./modules/rds/) | RDS instance, subnet group, parameter group, security group |
-| [`eks`](./modules/eks/) | EKS cluster, managed node groups, OIDC provider |
+| [Architecture](./docs/architecture.md) | How everything connects, network layout, security design |
+| [Getting Started](./docs/getting-started.md) | How to deploy this from scratch |
+| [Runbook](./docs/runbook.md) | How to make changes, upgrades, and handle incidents |
+| [CI Setup](./.github/SETUP.md) | How the automated checks are configured |
 
-## How environments differ
+---
 
-| Variable | dev | staging | prod |
-|---|---|---|---|
-| Instance class | `t3.micro` | `t3.medium` | `r5.large` |
-| EKS node type | `t3.small` | `t3.medium` | `m5.large` |
-| Multi-AZ | No | Yes | Yes |
-| NAT gateways | 1 (shared) | 1 (shared) | 1 per AZ |
-| Deletion protection | Off | Off | On |
-| Flow logs | Off | On | On |
+## Key design decisions
 
-## Getting started
+**Separate environments, not workspaces** — each environment lives in its own folder. Changes can't accidentally affect the wrong environment.
 
-### 1. Bootstrap remote state (once)
+**Everything is code** — no manual AWS console clicks. Every resource is defined, versioned, and reviewable.
 
-```bash
-cd bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars — set your project_name and aws_region
-terraform init
-terraform apply
-```
+**CI blocks bad changes** — infrastructure changes go through the same review process as application code. Nothing reaches prod without passing automated checks first.
 
-### 2. Deploy an environment
+**Deletion protection on prod** — the production database cannot be accidentally deleted. It takes a deliberate two-step process to remove it.
 
-```bash
-cd environments/dev
-terraform init
-terraform plan
-terraform apply
-```
-
-### 3. CI — GitHub Actions
-
-Every PR against `main` automatically runs `terraform plan` for all three environments and posts the results as a PR comment. No manual checks needed.
-
-Required GitHub Secrets:
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION`
-
-## Remote state
-
-All environments store state in the S3 bucket created by bootstrap, with DynamoDB locking to prevent concurrent applies.
-
-| Environment | State key |
-|---|---|
-| dev | `dev/terraform.tfstate` |
-| staging | `staging/terraform.tfstate` |
-| prod | `prod/terraform.tfstate` |
-
-## Design decisions
-
-**Modules are source-pinned by git tag** — each environment references modules at a specific tag (`?ref=v1.0.0`), so changes to a module don't silently affect prod. Promote changes: tag → update dev ref → test → update staging → test → update prod.
-
-**No Terraform workspaces** — workspaces share a backend and are easy to accidentally target. Separate directories per environment are explicit, auditable, and harder to misuse.
-
-**`prevent_destroy` on state resources** — the S3 bucket and DynamoDB table can't be deleted by `terraform destroy`. Protects against accidents.
-
-**Least-privilege IAM** — each module creates only the permissions it needs. No `*` actions, no wildcard resources unless genuinely required.
+**Secrets never in code** — database passwords and AWS credentials are passed as environment variables, never written into any file in the repo.
