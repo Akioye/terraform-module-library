@@ -176,14 +176,6 @@ resource "aws_security_group" "nodes" {
     self        = true
   }
 
-  ingress {
-    description              = "Control plane to nodes"
-    from_port                = 1025
-    to_port                  = 65535
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.cluster.id
-  }
-
   egress {
     description = "Allow all outbound"
     from_port   = 0
@@ -197,6 +189,16 @@ resource "aws_security_group" "nodes" {
     Environment = var.environment
     Project     = var.project_name
   }
+}
+
+resource "aws_security_group_rule" "nodes_ingress_cluster" {
+  description              = "Allow control plane to communicate with worker nodes"
+  type                     = "ingress"
+  from_port                = 1025
+  to_port                  = 65535
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.nodes.id
+  source_security_group_id = aws_security_group.cluster.id
 }
 
 # -------------------------------------------------------
