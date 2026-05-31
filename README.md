@@ -1,9 +1,5 @@
 # Terraform Module Library
 
-> Built by Toby Akioye · [github.com/Akioye/terraform-module-library](https://github.com/Akioye/terraform-module-library)
-
----
-
 ## What is this?
 
 This project is a **production-grade cloud infrastructure library** built on AWS using Terraform.
