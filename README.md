@@ -26,6 +26,13 @@ Most engineers set up cloud infrastructure manually — logging into AWS, clicki
 This project solves all of that. Every server, database, network, and permission is defined in code, version controlled, automatically tested, and fully reproducible.
 
 ---
+### Architectural Diagram
+<p align="center">
+    <img src="terraform-architecture-diagram.html" width="700" alt="project-architecture-diagram.png"/>
+  </a>
+</p>
+
+---
 
 ## What's inside
 
