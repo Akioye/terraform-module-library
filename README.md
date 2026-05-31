@@ -28,7 +28,7 @@ This project solves all of that. Every server, database, network, and permission
 ---
 ### Architectural Diagram
 <p align="center">
-    <img src="terraform-architecture-diagram.png" width="700" alt="terraform-architecture-diagram.png"/>
+    <img src="terraform-architecture-diagram.png" width="900" alt="terraform-architecture-diagram.png"/>
   </a>
 </p>
 
