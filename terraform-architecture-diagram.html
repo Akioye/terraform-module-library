@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terraform Module Library — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #020617; font-family: 'JetBrains Mono', monospace; color: #e2e8f0; min-height: 100vh; }
+.container { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.header-left { display: flex; align-items: center; gap: 14px; }
+.pulse { width: 10px; height: 10px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,.4)} 50%{box-shadow:0 0 0 6px rgba(34,211,238,0)} }
+.header h1 { font-size: 18px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.3px; }
+.header p { font-size: 11px; color: #64748b; margin-top: 3px; }
+.toolbar { position: relative; }
+.toolbar-toggle { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.toolbar-toggle:hover { background: #263548; }
+.toolbar-actions { display: none; position: absolute; right: 0; top: 36px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 6px; gap: 4px; flex-direction: column; min-width: 130px; z-index: 10; }
+.toolbar-actions.open { display: flex; }
+.toolbar-actions button { background: none; border: none; color: #94a3b8; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 11px; text-align: left; }
+.toolbar-actions button:hover { background: #263548; color: #e2e8f0; }
+.diagram-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 18px; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-cyan { background: #22d3ee; } .dot-amber { background: #fbbf24; } .dot-violet { background: #a78bfa; }
+.card h3 { font-size: 12px; font-weight: 600; color: #f1f5f9; }
+.card ul { list-style: none; }
+.card li { font-size: 10px; color: #64748b; padding: 3px 0; border-bottom: 1px solid #1e293b; line-height: 1.5; }
+.card li:last-child { border-bottom: none; }
+.footer { text-align: center; font-size: 10px; color: #334155; padding-top: 8px; }
+@media print { .toolbar { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="container" id="report-container">
+  <div class="header">
+    <div class="header-left">
+      <div class="pulse"></div>
+      <div>
+        <h1>Terraform Module Library</h1>
+        <p>AWS Infrastructure Architecture · 3 Environments · 5 Modules · CI/CD Pipeline</p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="toolbar-toggle" onclick="document.querySelector('.toolbar-actions').classList.toggle('open')">⋯</button>
+      <div class="toolbar-actions">
+        <button onclick="copyAsImage()">📋 Copy PNG</button>
+        <button onclick="downloadPNG()">🖼️ Download PNG</button>
+        <button onclick="downloadPDF()">📄 Download PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <svg width="100%" viewBox="0 0 900 1080" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>Terraform Module Library Architecture Diagram</title>
+      <desc>AWS infrastructure architecture showing GitHub CI/CD, three environments (dev, staging, prod), VPC with availability zones, EKS clusters, RDS databases, and supporting services.</desc>
+
+      <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#64748b"/>
+        </marker>
+        <marker id="arrowhead-cyan" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#22d3ee"/>
+        </marker>
+        <marker id="arrowhead-amber" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#fbbf24"/>
+        </marker>
+        <marker id="arrowhead-violet" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#a78bfa"/>
+        </marker>
+        <marker id="arrowhead-rose" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#fb7185"/>
+        </marker>
+      </defs>
+
+      <!-- Background grid -->
+      <rect width="900" height="1080" fill="#020617"/>
+      <rect width="900" height="1080" fill="url(#grid)"/>
+
+      <!-- ── TOP SECTION: GitHub + End Users + Admin ── -->
+
+      <!-- GitHub -->
+      <rect x="60" y="28" width="110" height="64" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="115" y="52" fill="#f1f5f9" font-size="11" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">GitHub</text>
+      <text x="115" y="68" fill="#64748b" font-size="9" text-anchor="middle" font-family="JetBrains Mono">CI/CD Triggers</text>
+      <text x="115" y="82" fill="#64748b" font-size="9" text-anchor="middle" font-family="JetBrains Mono">terraform-plan.yml</text>
+
+      <!-- End Users -->
+      <rect x="370" y="28" width="110" height="64" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="425" y="52" fill="#f1f5f9" font-size="11" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">End Users</text>
+      <text x="425" y="68" fill="#64748b" font-size="9" text-anchor="middle" font-family="JetBrains Mono">HTTP Traffic</text>
+      <text x="425" y="82" fill="#64748b" font-size="9" text-anchor="middle" font-family="JetBrains Mono">via Route 53</text>
+
+      <!-- Admin -->
+      <rect x="720" y="28" width="110" height="64" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="775" y="52" fill="#f1f5f9" font-size="11" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Admin</text>
+      <text x="775" y="68" fill="#64748b" font-size="9" text-anchor="middle" font-family="JetBrains Mono">kubectl / AWS CLI</text>
+      <text x="775" y="82" fill="#64748b" font-size="9" text-anchor="middle" font-family="JetBrains Mono">terraform apply</text>
+
+      <!-- Arrows from top -->
+      <line x1="115" y1="92" x2="115" y2="148" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead-cyan)"/>
+      <line x1="425" y1="92" x2="425" y2="148" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+      <line x1="775" y1="92" x2="775" y2="148" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+
+      <!-- ── AWS CLOUD BOUNDARY ── -->
+      <rect x="20" y="150" width="860" height="900" rx="12" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="8,4"/>
+      <rect x="20" y="150" width="100" height="20" rx="4" fill="#1e293b"/>
+      <text x="70" y="164" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">AWS Cloud</text>
+
+      <!-- ── REGION SERVICES ROW ── -->
+      <!-- IAM Role -->
+      <rect x="40" y="178" width="90" height="50" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="85" y="198" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">IAM Role</text>
+      <text x="85" y="212" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">least privilege</text>
+      <text x="85" y="222" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">IRSA + OIDC</text>
+
+      <!-- IAM User -->
+      <rect x="144" y="178" width="90" height="50" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="189" y="198" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">IAM User</text>
+      <text x="189" y="212" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">CI credentials</text>
+      <text x="189" y="222" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">GitHub Secrets</text>
+
+      <!-- Amazon S3 (state) -->
+      <rect x="248" y="178" width="90" height="50" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="293" y="198" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Amazon S3</text>
+      <text x="293" y="212" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">terraform state</text>
+      <text x="293" y="222" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">AES256 encrypted</text>
+
+      <!-- DynamoDB -->
+      <rect x="352" y="178" width="90" height="50" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="397" y="198" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">DynamoDB</text>
+      <text x="397" y="212" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">state locking</text>
+      <text x="397" y="222" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">prevent conflicts</text>
+
+      <!-- ECR -->
+      <rect x="456" y="178" width="90" height="50" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="501" y="198" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Amazon ECR</text>
+      <text x="501" y="212" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">container images</text>
+      <text x="501" y="222" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">private registry</text>
+
+      <!-- Secrets Manager -->
+      <rect x="560" y="178" width="90" height="50" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="605" y="194" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Secrets</text>
+      <text x="605" y="206" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Manager</text>
+      <text x="605" y="220" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">DB credentials</text>
+
+      <!-- CloudWatch -->
+      <rect x="664" y="178" width="90" height="50" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="709" y="194" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">CloudWatch</text>
+      <text x="709" y="206" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">VPC flow logs</text>
+      <text x="709" y="220" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">EKS control plane</text>
+
+      <!-- ── VPC BOUNDARY ── -->
+      <rect x="30" y="248" width="840" height="790" rx="10" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <rect x="30" y="248" width="50" height="16" rx="3" fill="#0f172a"/>
+      <text x="55" y="260" fill="#34d399" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">VPC</text>
+
+      <!-- Internet Gateway -->
+      <rect x="370" y="258" width="110" height="46" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="425" y="276" fill="#f1f5f9" font-size="10" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Internet Gateway</text>
+      <text x="425" y="292" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">Public internet access</text>
+
+      <!-- Arrow: End Users -> IGW -->
+      <line x1="425" y1="148" x2="425" y2="256" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+
+      <!-- ── ENVIRONMENTS ROW ── -->
+
+      <!-- DEV ENVIRONMENT -->
+      <rect x="38" y="318" width="250" height="700" rx="10" fill="rgba(8,51,68,0.2)" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <rect x="38" y="318" width="80" height="16" rx="3" fill="#0f172a"/>
+      <text x="78" y="330" fill="#22d3ee" font-size="9" font-weight="700" text-anchor="middle" font-family="JetBrains Mono">dev</text>
+
+      <!-- Staging ENVIRONMENT -->
+      <rect x="325" y="318" width="250" height="700" rx="10" fill="rgba(120,53,15,0.12)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <rect x="325" y="318" width="90" height="16" rx="3" fill="#0f172a"/>
+      <text x="370" y="330" fill="#fbbf24" font-size="9" font-weight="700" text-anchor="middle" font-family="JetBrains Mono">staging</text>
+
+      <!-- PROD ENVIRONMENT -->
+      <rect x="612" y="318" width="250" height="700" rx="10" fill="rgba(136,19,55,0.12)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <rect x="612" y="318" width="70" height="16" rx="3" fill="#0f172a"/>
+      <text x="647" y="330" fill="#fb7185" font-size="9" font-weight="700" text-anchor="middle" font-family="JetBrains Mono">prod</text>
+
+      <!-- ── AZ-A LABELS ── -->
+      <text x="163" y="348" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Availability Zone: a</text>
+      <text x="450" y="348" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Availability Zone: a</text>
+      <text x="737" y="348" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Availability Zone: a + b</text>
+
+      <!-- ── PUBLIC SUBNETS ── -->
+      <!-- DEV public subnet -->
+      <rect x="50" y="356" width="226" height="80" rx="6" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="1"/>
+      <text x="163" y="372" fill="#34d399" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Public Subnet  10.0.1.0/24</text>
+      <rect x="90" y="382" width="146" height="40" rx="4" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+      <text x="163" y="398" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">NAT Gateway</text>
+      <text x="163" y="412" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">single (cost saving)</text>
+
+      <!-- STAGING public subnet -->
+      <rect x="337" y="356" width="226" height="80" rx="6" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="1"/>
+      <text x="450" y="372" fill="#34d399" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Public Subnet  10.1.1.0/24</text>
+      <rect x="377" y="382" width="146" height="40" rx="4" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+      <text x="450" y="398" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">NAT Gateway</text>
+      <text x="450" y="412" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">single (cost saving)</text>
+
+      <!-- PROD public subnets (2 AZs) -->
+      <rect x="624" y="356" width="104" height="80" rx="6" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="1"/>
+      <text x="676" y="372" fill="#34d399" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Public AZ-a</text>
+      <rect x="634" y="380" width="84" height="38" rx="4" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+      <text x="676" y="398" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">NAT GW</text>
+      <text x="676" y="410" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">AZ-a</text>
+
+      <rect x="744" y="356" width="104" height="80" rx="6" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="1"/>
+      <text x="796" y="372" fill="#34d399" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Public AZ-b</text>
+      <rect x="754" y="380" width="84" height="38" rx="4" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+      <text x="796" y="398" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">NAT GW</text>
+      <text x="796" y="410" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">AZ-b (HA)</text>
+
+      <!-- IGW -> Public subnets arrows -->
+      <line x1="380" y1="304" x2="220" y2="356" stroke="#34d399" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead)"/>
+      <line x1="420" y1="304" x2="450" y2="356" stroke="#34d399" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead)"/>
+      <line x1="455" y1="304" x2="720" y2="356" stroke="#34d399" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead)"/>
+
+      <!-- ── PRIVATE APP SUBNETS / EKS ── -->
+      <!-- DEV EKS -->
+      <rect x="50" y="452" width="226" height="200" rx="6" fill="rgba(8,51,68,0.3)" stroke="#22d3ee" stroke-width="1"/>
+      <text x="163" y="468" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Private Subnet (App)  10.0.11.0/24</text>
+      <rect x="62" y="476" width="202" height="164" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="163" y="494" fill="#f1f5f9" font-size="10" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">EKS Cluster</text>
+      <text x="163" y="508" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">motg-dev · k8s 1.29</text>
+      <!-- deployment box -->
+      <rect x="74" y="516" width="178" height="112" rx="4" fill="rgba(8,51,68,0.5)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="163" y="530" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">deployment</text>
+      <rect x="86" y="536" width="154" height="26" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5"/>
+      <text x="163" y="553" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">service (ClusterIP)</text>
+      <rect x="86" y="568" width="154" height="26" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5"/>
+      <text x="163" y="585" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">pod · t3.micro SPOT</text>
+      <rect x="86" y="600" width="154" height="20" rx="3" fill="rgba(30,41,59,0.4)" stroke="#334155" stroke-width="0.5"/>
+      <text x="163" y="614" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">OIDC · IRSA enabled</text>
+
+      <!-- STAGING EKS -->
+      <rect x="337" y="452" width="226" height="200" rx="6" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="450" y="468" fill="#fbbf24" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Private Subnet (App)  10.1.11.0/24</text>
+      <rect x="349" y="476" width="202" height="164" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="450" y="494" fill="#f1f5f9" font-size="10" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">EKS Cluster</text>
+      <text x="450" y="508" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">motg-staging · k8s 1.29</text>
+      <rect x="361" y="516" width="178" height="112" rx="4" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="450" y="530" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">deployment</text>
+      <rect x="373" y="536" width="154" height="26" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5"/>
+      <text x="450" y="553" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">service (ClusterIP)</text>
+      <rect x="373" y="568" width="154" height="26" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5"/>
+      <text x="450" y="585" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">pod · t3.small SPOT</text>
+      <rect x="373" y="600" width="154" height="20" rx="3" fill="rgba(30,41,59,0.4)" stroke="#334155" stroke-width="0.5"/>
+      <text x="450" y="614" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">OIDC · IRSA enabled</text>
+
+      <!-- PROD EKS (two AZs) -->
+      <rect x="624" y="452" width="226" height="200" rx="6" fill="rgba(136,19,55,0.15)" stroke="#fb7185" stroke-width="1"/>
+      <text x="737" y="468" fill="#fb7185" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Private Subnet (App)  10.2.11-12.0/24</text>
+      <rect x="636" y="476" width="100" height="164" rx="6" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="686" y="494" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">EKS AZ-a</text>
+      <rect x="646" y="502" width="80" height="50" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5" stroke-dasharray="3,2"/>
+      <text x="686" y="516" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">service</text>
+      <rect x="646" y="518" width="80" height="18" rx="2" fill="rgba(30,41,59,0.8)" stroke="#334155" stroke-width="0.5"/>
+      <text x="686" y="531" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">pod ON_DEMAND</text>
+      <rect x="646" y="558" width="80" height="70" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5" stroke-dasharray="3,2"/>
+      <text x="686" y="572" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">service</text>
+      <rect x="646" y="578" width="80" height="18" rx="2" fill="rgba(30,41,59,0.8)" stroke="#334155" stroke-width="0.5"/>
+      <text x="686" y="591" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">pod ON_DEMAND</text>
+      <text x="686" y="617" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">t3.small</text>
+
+      <rect x="750" y="476" width="100" height="164" rx="6" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="800" y="494" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">EKS AZ-b</text>
+      <rect x="760" y="502" width="80" height="50" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5" stroke-dasharray="3,2"/>
+      <text x="800" y="516" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">service</text>
+      <rect x="760" y="518" width="80" height="18" rx="2" fill="rgba(30,41,59,0.8)" stroke="#334155" stroke-width="0.5"/>
+      <text x="800" y="531" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">pod ON_DEMAND</text>
+      <rect x="760" y="558" width="80" height="70" rx="3" fill="rgba(30,41,59,0.6)" stroke="#334155" stroke-width="0.5" stroke-dasharray="3,2"/>
+      <text x="800" y="572" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">service</text>
+      <rect x="760" y="578" width="80" height="18" rx="2" fill="rgba(30,41,59,0.8)" stroke="#334155" stroke-width="0.5"/>
+      <text x="800" y="591" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">pod ON_DEMAND</text>
+      <text x="800" y="617" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">t3.small</text>
+
+      <!-- AZ communication arrow (prod) -->
+      <line x1="736" y1="558" x2="750" y2="558" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead-rose)"/>
+
+      <!-- ── PRIVATE DATA SUBNETS / RDS ── -->
+      <!-- DEV RDS -->
+      <rect x="50" y="668" width="226" height="180" rx="6" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+      <text x="163" y="684" fill="#a78bfa" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Private Subnet (Data)  10.0.11.0/24</text>
+      <rect x="80" y="696" width="166" height="80" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="163" y="714" fill="#f1f5f9" font-size="10" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Amazon RDS</text>
+      <text x="163" y="728" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">Postgres 15.4</text>
+      <text x="163" y="742" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">db.t3.micro</text>
+      <text x="163" y="756" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">no Multi-AZ · skip snapshot</text>
+      <rect x="62" y="786" width="202" height="50" rx="4" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="163" y="800" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">DB Subnet Group</text>
+      <text x="163" y="814" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">encrypted at rest · gp3 storage</text>
+      <text x="163" y="826" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">backup: 3 days</text>
+
+      <!-- STAGING RDS -->
+      <rect x="337" y="668" width="226" height="180" rx="6" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+      <text x="450" y="684" fill="#a78bfa" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Private Subnet (Data)  10.1.11.0/24</text>
+      <rect x="367" y="696" width="166" height="80" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="450" y="714" fill="#f1f5f9" font-size="10" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Amazon RDS</text>
+      <text x="450" y="728" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">Postgres 15.4</text>
+      <text x="450" y="742" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="JetBrains Mono">db.t3.micro</text>
+      <text x="450" y="756" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">perf insights · final snapshot</text>
+      <rect x="349" y="786" width="202" height="50" rx="4" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="450" y="800" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">DB Subnet Group</text>
+      <text x="450" y="814" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">encrypted at rest · gp3 storage</text>
+      <text x="450" y="826" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">backup: 7 days</text>
+
+      <!-- PROD RDS (Multi-AZ) -->
+      <rect x="624" y="668" width="226" height="180" rx="6" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+      <text x="737" y="684" fill="#a78bfa" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">Private Subnet (Data)  10.2.11-12.0/24</text>
+      <rect x="636" y="696" width="100" height="80" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="686" y="716" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">RDS Master</text>
+      <text x="686" y="730" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">Postgres 15.4</text>
+      <text x="686" y="744" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">db.t3.micro</text>
+      <text x="686" y="758" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">deletion protection</text>
+      <rect x="750" y="696" width="100" height="80" rx="6" fill="rgba(76,29,149,0.25)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="800" y="716" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">RDS Standby</text>
+      <text x="800" y="730" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">AZ-b replica</text>
+      <text x="800" y="744" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="JetBrains Mono">sync replication</text>
+      <text x="800" y="758" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">auto failover</text>
+      <!-- replication arrow -->
+      <line x1="736" y1="736" x2="750" y2="736" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+      <rect x="636" y="786" width="214" height="50" rx="4" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="743" y="800" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">DB Subnet Group</text>
+      <text x="743" y="814" fill="#64748b" font-size="7" text-anchor="middle" font-family="JetBrains Mono">KMS encrypted · gp3 · 14d backup</text>
+      <text x="743" y="826" fill="#fb7185" font-size="7" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">deletion_protection = true</text>
+
+      <!-- EKS -> RDS arrows -->
+      <line x1="163" y1="652" x2="163" y2="668" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead-violet)"/>
+      <line x1="450" y1="652" x2="450" y2="668" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead-violet)"/>
+      <line x1="737" y1="652" x2="737" y2="668" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead-violet)"/>
+
+      <!-- ── S3 BUCKETS ROW ── -->
+      <rect x="50" y="858" width="226" height="48" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="163" y="876" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">S3: motg-dev-uploads</text>
+      <text x="163" y="892" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">versioning · force_destroy=true</text>
+
+      <rect x="337" y="858" width="226" height="48" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="450" y="876" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">S3: motg-staging-uploads</text>
+      <text x="450" y="892" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">versioning · IA transition 30d</text>
+
+      <rect x="624" y="858" width="226" height="48" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="737" y="876" fill="#f1f5f9" font-size="9" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">S3: motg-prod-uploads</text>
+      <text x="737" y="892" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">versioning · Glacier 90d · KMS</text>
+
+      <!-- ── REMOTE STATE BAR ── -->
+      <rect x="30" y="916" width="840" height="52" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="450" y="934" fill="#a78bfa" font-size="9" font-weight="700" text-anchor="middle" font-family="JetBrains Mono">Remote State Backend (bootstrap)</text>
+      <text x="250" y="952" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">S3: motg-terraform-state-us-east-1</text>
+      <text x="450" y="952" fill="#a78bfa" font-size="8" text-anchor="middle" font-family="JetBrains Mono">dev/  staging/  prod/  terraform.tfstate</text>
+      <text x="700" y="952" fill="#64748b" font-size="8" text-anchor="middle" font-family="JetBrains Mono">DynamoDB: motg-terraform-locks</text>
+
+      <!-- ── LEGEND ── -->
+      <rect x="30" y="978" width="840" height="52" rx="6" fill="rgba(30,41,59,0.4)" stroke="#1e293b" stroke-width="1"/>
+      <text x="60" y="996" fill="#64748b" font-size="8" font-weight="600" font-family="JetBrains Mono">Legend</text>
+      <rect x="110" y="986" width="12" height="12" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="128" y="996" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">dev environment</text>
+      <rect x="240" y="986" width="12" height="12" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="258" y="996" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">staging environment</text>
+      <rect x="380" y="986" width="12" height="12" rx="2" fill="rgba(136,19,55,0.3)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="398" y="996" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">prod environment</text>
+      <rect x="510" y="986" width="12" height="12" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="528" y="996" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">database / state</text>
+      <rect x="630" y="986" width="12" height="12" rx="2" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="648" y="996" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">security / IAM</text>
+      <line x1="110" y1="1016" x2="160" y2="1016" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead-cyan)"/>
+      <text x="168" y="1020" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">CI/CD trigger</text>
+      <line x1="260" y1="1016" x2="310" y2="1016" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+      <text x="318" y="1020" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">traffic / data flow</text>
+      <line x1="430" y1="1016" x2="480" y2="1016" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+      <text x="488" y="1020" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">DB replication</text>
+      <line x1="590" y1="1016" x2="640" y2="1016" stroke="#34d399" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrowhead)"/>
+      <text x="648" y="1020" fill="#94a3b8" font-size="8" font-family="JetBrains Mono">network route</text>
+    </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot dot-cyan"></div>
+        <h3>5 Reusable Modules</h3>
+      </div>
+      <ul>
+        <li>• vpc — network, subnets, NAT, flow logs</li>
+        <li>• iam — roles, policies, IRSA/OIDC</li>
+        <li>• s3 — storage, encryption, lifecycle</li>
+        <li>• rds — Postgres, subnet group, SG</li>
+        <li>• eks — cluster, node groups, add-ons</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot dot-amber"></div>
+        <h3>3 Isolated Environments</h3>
+      </div>
+      <ul>
+        <li>• dev — t3.micro, SPOT, single NAT, no HA</li>
+        <li>• staging — t3.small, SPOT, mirrors prod config</li>
+        <li>• prod — t3.small, ON_DEMAND, deletion protection</li>
+        <li>• Separate VPC CIDRs: 10.0 / 10.1 / 10.2</li>
+        <li>• Separate state keys per environment</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot dot-violet"></div>
+        <h3>CI/CD Pipeline</h3>
+      </div>
+      <ul>
+        <li>• terraform plan on every PR</li>
+        <li>• Matrix: dev + staging + prod in parallel</li>
+        <li>• Posts results as PR comment</li>
+        <li>• All plans passed = required status check</li>
+        <li>• Remote state: S3 + DynamoDB locking</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    Terraform Module Library · github.com/Akioye/terraform-module-library · AWS us-east-1
+  </div>
+</div>
+
+<script>
+function getRect() {
+  const el = document.getElementById('report-container');
+  const r = el.getBoundingClientRect();
+  return { el, x: r.left, y: r.top + window.scrollY, width: r.width, height: r.height };
+}
+function capture(scale = 2) {
+  const { el, x, y, width, height } = getRect();
+  const toolbar = document.querySelector('.toolbar');
+  return html2canvas(document.body, {
+    x, y, width, height,
+    scale,
+    backgroundColor: '#020617',
+    ignoreElements: el => el === toolbar || toolbar.contains(el),
+    windowWidth: document.documentElement.scrollWidth,
+    windowHeight: document.documentElement.scrollHeight,
+    scrollX: 0, scrollY: -window.scrollY
+  });
+}
+async function copyAsImage() {
+  const canvas = await capture(2);
+  canvas.toBlob(blob => navigator.clipboard.write([new ClipboardItem({'image/png': blob})]));
+}
+async function downloadPNG() {
+  const canvas = await capture(2);
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'terraform-architecture.png';
+  a.click();
+}
+async function downloadPDF() {
+  const canvas = await capture(2);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+  pdf.save('terraform-architecture.pdf');
+}
+</script>
+</body>
+</html>
